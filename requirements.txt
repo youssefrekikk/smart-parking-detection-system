@@ -1,0 +1,25 @@
+# Web framework and API
+fastapi>=0.104.1
+uvicorn>=0.24.0
+python-multipart>=0.0.6
+aiofiles>=23.2.1
+websockets>=11.0.3
+
+# Database
+sqlalchemy>=2.0.23
+psycopg2-binary>=2.9.9
+alembic>=1.15.2
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# Computer vision and ML
+opencv-python>=4.8.1
+numpy>=1.26.2
+ultralytics>=8.0.196
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Utilities
+pydantic>=2.5.2
+asyncio>=3.4.3
