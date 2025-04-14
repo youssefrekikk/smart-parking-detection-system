@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Feed Admin</title>
+    <!-- Add Fabric.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+        }
+        .sidebar {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            max-height: 100vh;
+            overflow-y: auto;
+        }
+        .main-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #video-container {
+            position: relative;
+            width: 100%;
+            height: 500px;
+            background-color: #000;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        #video-feed {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+            background-color: #000;
+        }
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10; /* Ensure canvas is above the image */
+        }
+        /* Make sure the fabric-canvas and upper-canvas also take full size */
+        #drawing-canvas, .canvas-container, .upper-canvas, .lower-canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .controls button {
+            min-width: 120px;
+            flex: 1;
+        }
+        .box-list {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        .box-item {
+            padding: 10px;
+            border: 1px solid #ddd;
+            margin-bottom: 5px;
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .box-item.selected {
+            background-color: #f0f0f0;
+            border: 1px solid #999;
+        }
+        .box-item button {
+            width: auto;
+            padding: 5px 10px;
+            background-color: #f44336;
+        }
+        .box-item button:hover {
+            background-color: #d32f2f;
+        }
+        .box-item .box-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .box-item .group-input {
+            margin-top: 5px;
+        }
+        .box-item .group-input input {
+            width: 100%;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .angle-control {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .angle-control input {
+            width: 100px;
+        }
+        .section-title {
+            margin-top: 20px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+                        <!-- Add this in the sidebar section, after the existing controls -->
+            <div style="margin-top: 20px; padding-top: 10px; border-top: 1px solid #ddd;">
+                <h3 class="section-title">Additional Tools</h3>
+                <div style="margin-top: 10px;">
+                    <a href="/parking-test" target="_blank" style="display: block; text-align: center; padding: 10px; background-color: #2196F3; color: white; text-decoration: none; border-radius: 4px;">
+                        Test Parking Detection
+                    </a>
+                </div>
+            </div>
+
+            
+            <h2>Camera Management</h2>
+            <div class="form-group">
+                <label for="camera-id">Camera ID</label>
+                <input type="text" id="camera-id" required>
+            </div>
+            <div class="form-group">
+                <label for="camera-type">Camera Type</label>
+                <select id="camera-type">
+                    <option value="webcam">Webcam</option>
+                    <option value="video_file">Video File</option>
+                    <option value="ip_camera">IP Camera</option>
+                </select>
+            </div>
+            <div class="form-group" id="url-input-group" style="display: none;">
+                <label for="camera-url">Camera URL</label>
+                <input type="text" id="camera-url" placeholder="For IP camera or RTSP stream">
+            </div>
+            <div class="form-group" id="video-file-group" style="display: none;">
+                <label for="video-file">Video File</label>
+                <input type="file" id="video-file" accept="video/*">
+            </div>
+            <div class="form-group">
+                <label for="camera-location">Location</label>
+                <input type="text" id="camera-location" required>
+            </div>
+            <button id="add-camera">Add Camera</button>
+
+
+            <!-- Add the missing angle-control div -->
+            <div id="angle-control" style="display: none;">
+                <label for="box-color">Box Color</label>
+                <input type="color" id="box-color" value="#00ff00">
+            </div>
+            <h3 class="section-title">Box Grouping</h3>
+            <div class="controls" id="grouping-controls">
+                <button id="toggle-group-mode">Create Group</button>
+                <button id="save-group" style="display: none;">Save Group</button>
+            </div>
+            <div id="selection-info" style="margin: 10px 0; padding: 5px; display: none;"></div>
+            <div id="groups-list" class="box-list">
+                <!-- Groups will be listed here -->
+            </div>
+
+            <h3 class="section-title">Individual Boxes</h3>
+            <div class="box-list" id="box-list">
+                <!-- Boxes will be listed here -->
+            </div>
+
+
+            <h3 class="section-title">Drawing Controls</h3>
+            <div class="controls">
+                <button id="start-drawing">Start Drawing</button>
+                <button id="clear-boxes">Clear Boxes</button>
+                <button id="save-mask">Save Mask</button>
+            </div>
+            
+            
+        </div>
+
+        <div class="main-content">
+            <h2>Video Frame</h2>
+            <div id="video-container">
+                <img id="video-feed" style="display: none; max-width: 100%; max-height: 100%;">
+                <div id="canvas-container">
+                    <canvas id="drawing-canvas"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include the external JavaScript file -->
+    <script src="/static/grouping.js"></script>
+    <script src="/static/admin.js"></script>
+</body>
+</html>

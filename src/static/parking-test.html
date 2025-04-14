@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parking Detection Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1, h2, h3 {
+            color: #333;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .results {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            display: none;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            flex: 1;
+            padding: 15px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            margin: 0 10px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        .group-stats {
+            margin-top: 20px;
+        }
+        .group-card {
+            padding: 15px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            margin-bottom: 10px;
+        }
+        .group-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .group-name {
+            font-weight: bold;
+        }
+        .progress-bar {
+            height: 10px;
+            background-color: #e0e0e0;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #4CAF50;
+        }
+        .visualization {
+            margin-top: 20px;
+        }
+        .visualization img {
+            max-width: 100%;
+            border-radius: 4px;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+            color: #666;
+            display: none;
+        }
+        .error {
+            color: #d32f2f;
+            padding: 10px;
+            background-color: #ffebee;
+            border-radius: 4px;
+            margin-top: 10px;
+            display: none;
+        }
+        .nav-links {
+            margin-bottom: 20px;
+        }
+        .nav-links a {
+            margin-right: 15px;
+            color: #2196F3;
+            text-decoration: none;
+        }
+        .nav-links a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/admin">Admin</a>
+            <a href="/parking-test">Parking Test</a>
+        </div>
+        
+        <h1>Parking Detection Test</h1>
+        
+        <div class="form-group">
+            <label for="camera-id">Camera ID</label>
+            <select id="camera-id">
+                <option value="">Select a camera</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="detection-method">Detection Method</label>
+            <select id="detection-method">
+                <option value="yolo">YOLO (if available)</option>
+                <option value="fallback">Simple Detection (Fallback)</option>
+            </select>
+        </div>
+        
+        <button id="test-button">Test Parking Detection</button>
+        
+        <div id="loading" class="loading">
+            Testing parking detection... Please wait.
+        </div>
+        
+        <div id="error" class="error"></div>
+        
+        <div id="results" class="results">
+            <h2>Detection Results</h2>
+            
+            <div class="stats">
+                <div class="stat-card">
+                    <h3>Total Spots</h3>
+                    <div id="total-spots" class="stat-value">-</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Available Spots</h3>
+                    <div id="available-spots" class="stat-value">-</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Availability</h3>
+                    <div id="percentage" class="stat-value">-</div>
+                </div>
+            </div>
+            
+            <div id="group-stats" class="group-stats">
+                <h3>Parking Areas</h3>
+                <div id="group-cards"></div>
+            </div>
+            
+            <div class="visualization">
+                <h3>Visualization</h3>
+                <img id="visualization-img" src="" alt="Parking detection visualization">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function loadCameraList() {
+            fetch('http://localhost:8000/list-cameras')
+                .then(response => response.json())
+                .then(data => {
+                    const cameraSelect = document.getElementById('camera-id');
+                    cameraSelect.innerHTML = '<option value="">Select a camera</option>';
+                    
+                    data.cameras_with_masks.forEach(cameraId => {
+                        const option = document.createElement('option');
+                        option.value = cameraId;
+                        option.textContent = cameraId;
+                        cameraSelect.appendChild(option);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading camera list:', error);
+                });
+        }
+        document.addEventListener('DOMContentLoaded', function() {
+            loadCameraList();
+            const testButton = document.getElementById('test-button');
+            const loadingDiv = document.getElementById('loading');
+            const errorDiv = document.getElementById('error');
+            const resultsDiv = document.getElementById('results');
+            
+            testButton.addEventListener('click', function() {
+                const cameraId = document.getElementById('camera-id').value;
+                if (!cameraId) {
+                    errorDiv.textContent = 'Please enter a camera ID';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+                
+                const detectionMethod = document.getElementById('detection-method').value;
+                
+                // Reset UI
+                errorDiv.style.display = 'none';
+                resultsDiv.style.display = 'none';
+                loadingDiv.style.display = 'block';
+                
+                // Call the test endpoint
+                fetch(`http://localhost:8000/test-parking-detection/${cameraId}?method=${detectionMethod}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            return response.json().then(errorData => {
+                                throw new Error(errorData.detail || 'Failed to test parking detection');
+                            });
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log('Parking detection results:', data);
+                        
+                        // Hide loading
+                        loadingDiv.style.display = 'none';
+                        
+                        // Update results
+                        document.getElementById('total-spots').textContent = data.total_spots;
+                        document.getElementById('available-spots').textContent = data.available_spots;
+                        document.getElementById('percentage').textContent = `${data.percentage_available}%`;
+                        
+                        // Update group stats
+                        const groupCardsDiv = document.getElementById('group-cards');
+                        groupCardsDiv.innerHTML = '';
+                        
+                        if (data.group_stats && Object.keys(data.group_stats).length > 0) {
+                            for (const [groupId, stats] of Object.entries(data.group_stats)) {
+                                const groupCard = document.createElement('div');
+                                groupCard.className = 'group-card';
+                                
+                                groupCard.innerHTML = `
+                                    <div class="group-header">
+                                        <div class="group-name">${stats.location}</div>
+                                        <div>${stats.available}/${stats.total} available (${stats.percentage}%)</div>
+                                    </div>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: ${stats.percentage}%"></div>
+                                    </div>
+                                `;
+                                
+                                groupCardsDiv.appendChild(groupCard);
+                            }
+                        } else {
+                            groupCardsDiv.innerHTML = '<p>No group information available</p>';
+                        }
+                    
+                        
+                        // Update visualization
+                        document.getElementById('visualization-img').src = `data:image/jpeg;base64,${data.visualization}`;
+                        
+                        // Show results
+                        resultsDiv.style.display = 'block';
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        
+                        // Hide loading
+                        loadingDiv.style.display = 'none';
+                        
+                        // Show error
+                        errorDiv.textContent = `Error: ${error.message}`;
+                        errorDiv.style.display = 'block';
+                    });
+            });
+        });
+    </script>
+</body>
+</html>
