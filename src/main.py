@@ -15,6 +15,9 @@ from sqlalchemy.orm import Session
 import base64
 import logging
 from datetime import datetime
+from parking_spot_annotation_model import ParkingSpotAnnotator
+import tempfile
+from fastapi.responses import JSONResponse
 
 # Import local modules
 from video_simulator import VideoSimulator
@@ -1006,6 +1009,97 @@ async def migrate_data(db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Error migrating data: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error migrating data: {str(e)}")
+
+
+# Add this after the existing routes
+@app.post("/api/auto-generate-boxes")
+async def auto_generate_boxes(
+    image: UploadFile = File(...),
+    confidence: float = Form(0.3)
+):
+    """
+    Auto-generate parking spot boxes using the trained AI model
+    """
+    try:
+        # Validate confidence threshold
+        confidence = max(0.01, min(0.9, confidence))
+        
+        # Save uploaded image to temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
+            content = await image.read()
+            temp_file.write(content)
+            temp_image_path = temp_file.name
+        
+        try:
+            # Initialize the AI model
+            # Try to find a trained model
+            model_paths = [ 
+                "runs/detect/train3/weights/best.pt",
+                "models/parking_spot_detector.pt",
+                "dataset_augmented/runs/obb/train/weights/best.pt"
+            ]
+            
+            model_path = None
+            for path in model_paths:
+                if os.path.exists(path):
+                    model_path = path
+                    break
+            
+            if not model_path:
+                # If no trained model found, create one with fallback detection
+                logger.warning("No trained model found, using fallback detection")
+                model = ParkingSpotAnnotator()
+            else:
+                logger.info(f"Using trained model: {model_path}")
+                model = ParkingSpotAnnotator(model_path)
+            
+            # Detect parking spots
+            spots_data = model.detect_parking_spots(
+                image_path=temp_image_path, 
+                conf=confidence
+            )
+            
+            if not spots_data:
+                return JSONResponse(
+                    status_code=200,
+                    content={
+                        "boxes": [],
+                        "groups": [],
+                        "message": "No parking spots detected"
+                    }
+                )
+            
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "boxes": spots_data.get("boxes", []),
+                    "groups": spots_data.get("groups", []),
+                    "camera_id": spots_data.get("camera_id", "ai_generated"),
+                    "confidence_threshold": confidence,
+                    "message": f"Generated {len(spots_data.get('boxes', []))} parking spots"
+                }
+            )
+            
+        finally:
+            # Clean up temporary file
+            if os.path.exists(temp_image_path):
+                os.unlink(temp_image_path)
+                
+    except Exception as e:
+        logger.error(f"Error in auto_generate_boxes: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": f"Failed to generate boxes: {str(e)}",
+                "boxes": [],
+                "groups": []
+            }
+        )
+        
+        
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

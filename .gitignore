@@ -66,6 +66,12 @@ masks/*
 logs/
 
 # Database
+dataset/    
+dataset_augmented/
+dataset_regular/
+quick_dataset/
+
+
 #*.db
 #*.sqlite3
 

@@ -20,3 +20,4 @@ A FastAPI-based system for detecting available parking spots using computer visi
 - Fabric.js for UI interactions
 - Alembic for database migrations
 - WebSockets for real-time communication
+```

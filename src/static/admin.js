@@ -12,6 +12,8 @@ let isResizing = false;
 let isMoving = false;
 let isMouseDown = false; // Track mouse state for drawing
 
+let aiPredictions;
+
 // Initialize Fabric.js canvas
 function initFabric() {
     console.log("Initializing Fabric.js canvas");
@@ -529,6 +531,25 @@ function saveMask() {
 document.addEventListener('DOMContentLoaded', function() {
     console.log("DOM fully loaded, setting up event listeners");
     
+    const autoGenerateBtn = document.getElementById('auto-generate-boxes');
+    if (autoGenerateBtn) {
+        console.log("Auto-generate button found, adding event listener");
+        autoGenerateBtn.addEventListener('click', autoGenerateBoxes);
+    } else {
+        console.error("Auto-generate button not found!");
+    }
+    
+    // Add confidence threshold slider handler - ADD THESE LINES
+    const confidenceSlider = document.getElementById('confidence-threshold');
+    const confidenceValue = document.getElementById('confidence-value');
+    if (confidenceSlider && confidenceValue) {
+        console.log("Confidence slider found, adding event listener");
+        confidenceSlider.addEventListener('input', function() {
+            confidenceValue.textContent = this.value;
+        });
+    } else {
+        console.error("Confidence slider not found!");
+    }
     // Register event listeners for UI controls
     document.getElementById('add-camera').addEventListener('click', () => {
         const cameraId = document.getElementById('camera-id').value;
@@ -612,7 +633,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Fix for camera type selection - immediately show/hide appropriate fields
     const cameraTypeSelect = document.getElementById('camera-type');
+
+
     
+
+
+
+
+
     // Function to update input fields visibility based on camera type
     function updateCameraInputFields() {
         const type = cameraTypeSelect.value;
@@ -657,8 +685,186 @@ document.getElementById('clear-boxes').addEventListener('click', () => {
         }
     }
 });
+// Add this function at the end of the existing admin.js file, before the window exports
+
+// Auto-generate boxes using AI model
+// Auto-generate boxes using AI model
+async function autoGenerateBoxes() {
+    console.log("Auto-generate boxes clicked!"); // Debug log
+    
+    const cameraId = document.getElementById('camera-id').value;
+    if (!cameraId) {
+        alert('Please register a camera first');
+        return;
+    }
+
+    const button = document.getElementById('auto-generate-boxes');
+    const confidenceThreshold = document.getElementById('confidence-threshold')?.value || 0.3;
+    
+    console.log("Starting auto-generation with confidence:", confidenceThreshold); // Debug log
+    
+    try {
+        // Show loading state
+        button.disabled = true;
+        button.textContent = 'Generating...';
+        
+        // Get current frame from video feed
+        const videoElement = document.getElementById('video-feed');
+        if (!videoElement.src) {
+            throw new Error('No video feed available. Please capture a frame first.');
+        }
+        
+        console.log("Video element found, capturing frame..."); // Debug log
+        
+        // Create a canvas to capture the current frame
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCanvas.width = videoElement.naturalWidth || videoElement.width || 640;
+        tempCanvas.height = videoElement.naturalHeight || videoElement.height || 480;
+        
+        // Draw the current video frame
+        tempCtx.drawImage(videoElement, 0, 0, tempCanvas.width, tempCanvas.height);
+        
+        // Convert to blob
+        const blob = await new Promise(resolve => tempCanvas.toBlob(resolve, 'image/jpeg', 0.8));
+        
+        console.log("Frame captured, sending to server..."); // Debug log
+        
+        // Create form data
+        const formData = new FormData();
+        formData.append('image', blob, 'frame.jpg');
+        formData.append('confidence', confidenceThreshold);
+        
+        // Send to backend for AI processing
+        const response = await fetch('/api/auto-generate-boxes', {
+            method: 'POST',
+            body: formData
+        });
+        
+        console.log("Server response status:", response.status); // Debug log
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Failed to generate boxes');
+        }
+        
+        const result = await response.json();
+        console.log("Server response:", result); // Debug log
+        
+        // Ask user if they want to clear existing boxes
+        if (fabricObjects.length > 0) {
+            const shouldClear = confirm(
+                `Found ${result.boxes.length} parking spots!\n\n` +
+                `You currently have ${fabricObjects.length} existing boxes.\n` +
+                `Do you want to clear existing boxes and replace them?\n\n` +
+                `Click "OK" to replace, or "Cancel" to add to existing boxes.`
+            );
+            
+            if (shouldClear) {
+                // Clear existing boxes
+                canvas.clear();
+                fabricObjects = [];
+                document.getElementById('box-list').innerHTML = '';
+                
+                // Also clear groups if grouping is initialized
+                if (window.boxGroups) {
+                    window.boxGroups = [];
+                    const groupsList = document.getElementById('groups-list');
+                    if (groupsList) {
+                        groupsList.innerHTML = '<div class="no-groups">No groups created yet</div>';
+                    }
+                }
+            }
+        }
+        
+        // Add generated boxes to canvas
+        if (result.boxes && result.boxes.length > 0) {
+            addGeneratedBoxesToCanvas(result.boxes);
+            alert(`Successfully generated ${result.boxes.length} parking spot boxes!`);
+        } else {
+            alert('No parking spots detected. Try adjusting the confidence threshold or ensure the image contains parking areas.');
+        }
+        
+    } catch (error) {
+        console.error('Error generating boxes:', error);
+        alert(`Error generating boxes: ${error.message}`);
+    } finally {
+        // Reset button state
+        button.disabled = false;
+        button.textContent = '🤖 Auto-Generate Boxes';
+    }
+}
+
+// Add generated boxes to canvas (helper function)
+function addGeneratedBoxesToCanvas(boxes) {
+    console.log("Adding", boxes.length, "boxes to canvas"); // Debug log
+    
+    if (!canvas) {
+        console.error('Canvas not initialized');
+        return;
+    }
+    
+    const canvasWidth = canvas.getWidth();
+    const canvasHeight = canvas.getHeight();
+    
+    boxes.forEach((box, index) => {
+        // Convert normalized coordinates to canvas coordinates
+        const left = box.x1 * canvasWidth;
+        const top = box.y1 * canvasHeight;
+        const width = (box.x2 - box.x1) * canvasWidth;
+        const height = (box.y2 - box.y1) * canvasHeight;
+        
+        // Get color based on group
+        const groupColors = {
+            'group_1': '#FF6B6B',  // Red
+            'group_2': '#4ECDC4',  // Teal
+            'group_3': '#45B7D1',  // Blue
+            'group_4': '#96CEB4',  // Green
+            'group_5': '#FFEAA7',  // Yellow
+            'default': '#FF9F43'   // Orange
+        };
+        const color = groupColors[box.group_id] || groupColors['default'];
+        
+        // Create fabric rectangle
+        const rect = new fabric.Rect({
+            left: left,
+            top: top,
+            width: width,
+            height: height,
+            fill: 'transparent',
+            stroke: color,
+            strokeWidth: 2,
+            transparentCorners: false,
+            cornerColor: 'white',
+            cornerStrokeColor: 'black',
+            borderColor: 'black',
+            cornerSize: 10,
+            padding: 5,
+            cornerStyle: 'circle',
+            hasRotatingPoint: true,
+            centeredRotation: true,
+            angle: box.angle || 0
+        });
+        
+        // Add metadata
+        rect.groupId = box.group_id || 'default';
+        rect.confidence = box.confidence || 0;
+        rect.isAIGenerated = true;
+        
+        // Add to canvas and tracking
+        canvas.add(rect);
+        fabricObjects.push(rect);
+    });
+    
+    // Update the box list
+    updateBoxList();
+    canvas.renderAll();
+}
+
 
 // Make sure functions are defined in global scope
+window.autoGenerateBoxes = autoGenerateBoxes;
+window.addGeneratedBoxesToCanvas = addGeneratedBoxesToCanvas;
 window.updateBoxAngle = updateBoxAngle;
 window.removeBox = removeBox;
 

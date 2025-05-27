@@ -182,7 +182,7 @@ def obb_intersection_area(boxA, boxB):
         print(traceback.format_exc())
         return 0
 
-def detect_parking_spots(frame, parking_spots, model_path="yolov8n.pt", overlap_threshold=0.4):
+def detect_parking_spots(frame, parking_spots, model_path="yolov8m.pt", overlap_threshold=0.4):
     """
     Detect available parking spots in a frame using YOLOv8
     """
@@ -458,7 +458,7 @@ def fallback_detection(frame, parking_spots):
         "visualization_frame": vis_frame
     }
 
-def test_detection(mask_path, image_path, output_path=None, model_path="yolov8n.pt"):
+def test_detection(mask_path, image_path, output_path=None, model_path="yolov8m.pt"):
     """
     Test the parking spot detection on a single image
     """
@@ -514,7 +514,7 @@ if __name__ == "__main__":
         mask_path = sys.argv[1]
         image_path = sys.argv[2]
         output_path = sys.argv[3] if len(sys.argv) > 3 else None
-        model_path = sys.argv[4] if len(sys.argv) > 4 else "yolov8n.pt"
+        model_path = sys.argv[4] if len(sys.argv) > 4 else "yolov8m.pt"
         test_detection(mask_path, image_path, output_path, model_path)
     else:
         print("Usage: python parkingspot_detection.py <mask_path> <image_path> [output_path] [model_path]")
